@@ -1,0 +1,27 @@
+name: Continuos Integration
+on:
+  pull_request:
+    branches: 
+      - main
+    
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Descargando Repositorio
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+      - name: Restaurar Dependencias
+        run: dotnet restore ServiceDemo.slnx
+      - name: limpiar Solución
+        run: dotnet clean ServiceDemo.slnx --configuration Release
+      - name: Compilar Solución
+        run: dotnet build ServiceDemo.slnx --no-restore --configuration Release
+      - name: Test
+        run: dotnet test ServiceDemo.slnx --no-build --configuration Release --verbosity normal
+      - name: Instalar Stryker
+        run: dotnet tool install -g dotnet-stryker
+      - name: Ejecutar Mutation Testing
+        run: dotnet stryker --solution ServiceDemo.slnx    
