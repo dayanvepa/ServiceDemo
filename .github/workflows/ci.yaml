@@ -24,4 +24,4 @@ jobs:
       - name: Instalar Stryker
         run: dotnet tool install -g dotnet-stryker
       - name: Ejecutar Mutation Testing
-        run: dotnet stryker --solution ServiceDemo.slnx    
+        run: dotnet stryker   
