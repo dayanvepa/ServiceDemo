@@ -1,18 +1,16 @@
 {
   "stryker-config": {
     "mutate": [
-      "src/**/*.cs",
-      "!src/**/Program.cs",
-      "!src/**/Migrations/*.cs",
-      "!src/**/Migrations/*.Designer.cs",
-      "!src/**/DTOs/**/*.cs",
-      "!src/**/Mappings/**/*.cs",
-      "!src/**/Common/**/*.cs",
-      "!src/**/Interfaces/**/*.cs",
-      "!src/**/Validators/**/*.cs"
+      "**/*.cs",
+      "!**/DTOs/Product/*.cs",
+      "!**/Mappings/*.cs",
+      "!**/Common/*.cs",
+      "!**/Interfaces/*.cs",
+      "!**/Migrations/*.cs",
+      "!**/Validators/Product/*.cs"
     ],
-     "test-projects": [
-      "tests/ServiceDemo.Tests/ServiceDemo.Tests.csproj"
+    "test-projects": [
+      "ServiceDemo.Tests.csproj"
     ],
    "ignore-methods": [ 
       "LogInformation", 

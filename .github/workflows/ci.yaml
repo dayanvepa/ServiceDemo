@@ -15,13 +15,26 @@ jobs:
           dotnet-version: 9.0.x
       - name: Restaurar Dependencias
         run: dotnet restore ServiceDemo.slnx
+
       - name: limpiar Solución
         run: dotnet clean ServiceDemo.slnx --configuration Release
+
       - name: Compilar Solución
         run: dotnet build ServiceDemo.slnx --no-restore --configuration Release
-      - name: Test
+
+      - name: Tests unitarios 
         run: dotnet test ServiceDemo.slnx --no-build --configuration Release --verbosity normal
-      - name: Instalar Stryker
-        run: dotnet tool install -g dotnet-stryker
-      - name: Ejecutar Mutation Testing
-        run: dotnet stryker   
+
+      - name: Restore local tools (Stryker)
+        run: dotnet tool restore
+
+      - name: Ejecutar Mutation Testing (Stryker)
+        working-directory: tests/ServiceDemo.Tests
+        run: dotnet stryker
+
+      - name: Subir reporte HTML de Stryker
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stryker-report
+          path: tests/ServiceDemo.Tests/StrykerOutput/**
