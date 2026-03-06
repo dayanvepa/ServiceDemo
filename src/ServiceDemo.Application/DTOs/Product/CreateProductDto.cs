@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ServiceDemo.Application.DTOs.Product
 {
+    //<summary>
+    // DTO for creating a new product
+    //</summary>
     public class CreateProductDto
     {
         [Required(ErrorMessage = "Name is required")]
