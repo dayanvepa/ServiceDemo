@@ -31,10 +31,3 @@ jobs:
       - name: Ejecutar Mutation Testing (Stryker)
         working-directory: tests/ServiceDemo.Tests
         run: dotnet stryker
-
-      - name: Subir reporte HTML de Stryker
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: stryker-report
-          path: tests/ServiceDemo.Tests/StrykerOutput/**
