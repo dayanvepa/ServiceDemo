@@ -28,4 +28,4 @@ services:
       - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=ServiceDemoDB;User Id=sa;Password=Chilly2025!;TrustServerCertificate=True;MultipleActiveResultSets=True
        
 volumes:
-  sql_data:git
+  sql_data:
