@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
     <GenerateEmbeddedResourceResxSource>false</GenerateEmbeddedResourceResxSource>
+    <UserSecretsId>c72c1296-30e3-4101-ae22-77c0792ac2ab</UserSecretsId>
   </PropertyGroup>
 
    <ItemGroup>
