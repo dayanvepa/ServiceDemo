@@ -1,6 +1,7 @@
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
     container_name: servicedemo-db
     restart: always
     environment:
@@ -10,11 +11,6 @@ services:
       - "1433:1433"
     volumes:
       - sql_data:/var/opt/mssql
-    healthcheck:
-      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "Chilly2025!", "-Q", "SELECT 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   api:
     build:
@@ -24,7 +20,7 @@ services:
     restart: always
     depends_on:
       sqlserver:
-        condition: service_healthy
+        condition: service_started
     ports:
       - "8080:8080"
     environment:
@@ -32,4 +28,4 @@ services:
       - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=ServiceDemoDB;User Id=sa;Password=Chilly2025!;TrustServerCertificate=True;MultipleActiveResultSets=True
        
 volumes:
-  sql_data:
+  sql_data:git
