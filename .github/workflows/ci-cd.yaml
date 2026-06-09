@@ -1,7 +1,11 @@
-name: Continuos Integration
+name: CI and CD Pipeline
+
 on:
+  push:
+    branches:
+      - main
   pull_request:
-    branches: 
+    branches:
       - main
 
 env:
@@ -11,14 +15,14 @@ env:
   REPOSITORY: mi-app
 
 jobs:
-  build:
+  # --- PARTE DE CI ---
+  ci:
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
-
     steps:
-
+      
       - name: Descargando Repositorio
         uses: actions/checkout@v4
 
@@ -45,21 +49,49 @@ jobs:
       - name: Ejecutar Mutation Testing (Stryker)
         working-directory: tests/ServiceDemo.Tests
         run: dotnet stryker
-
+      
       - name: Google Auth
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v2
-
-      - name: Docker Auth
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
-
       - name: Build and Push Container
         run: |
           IMAGE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
           docker build -t $IMAGE_URL .
           docker push $IMAGE_URL
+
+  # --- PARTE DE CD ---
+  cd:
+    needs: ci # <---  evalúa que el CI esté completo y exitoso
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # <--- evalúa que sea el push a main
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    steps:
+      - name: Checkout code
+      - uses: actions/checkout@v4
+    
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ env.REGION }}
+          image: "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          flags: '--allow-unauthenticated'
+
+      - name: Show Service URL
+        run: |
+          echo "Deployed at: $(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')"
