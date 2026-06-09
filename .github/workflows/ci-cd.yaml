@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -17,7 +14,6 @@ env:
 jobs:
   # --- PARTE DE CI ---
   ci:
-    if: github.event_name == 'pull_request'  # Solo corre en PR
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
@@ -66,6 +62,7 @@ jobs:
 
   # --- PARTE DE CD ---
   cd:
+    needs: ci # <---  evalúa que el CI esté completo y exitoso
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' # <--- evalúa que sea el push a main
     runs-on: ubuntu-latest
     permissions:
