@@ -10,6 +10,8 @@ env:
   REGION: us-central1
   SERVICE_NAME: mi-app
   REPOSITORY: mi-app
+  SONAR_PROJECT_KEY: lego1300
+  SONAR_ORGANIZATION: dayanvepa
 
 jobs:
   # --- PARTE DE CI ---
@@ -20,7 +22,7 @@ jobs:
       id-token: 'write'
     steps:
       
-      - name: Descargando Repositorio
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup .NET
@@ -28,17 +30,38 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
-      - name: Restaurar Dependencias
-        run: dotnet restore ServiceDemo.slnx
+      - name: Install SonarScanner
+        run: |
+          dotnet tool install --global dotnet-sonarscanner
+
+      - name: Add .NET tools to PATH
+        run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
       - name: limpiar Solución
         run: dotnet clean ServiceDemo.slnx --configuration Release
 
+      - name: Begin Sonar Analysis
+        run: |
+          dotnet sonarscanner begin \
+            /k:"${{ env.SONAR_PROJECT_KEY }}" \
+            /o:"${{ env.SONAR_ORGANIZATION }}" \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.host.url="https://sonarcloud.io" \
+            /d:sonar.qualitygate.wait=true
+
+      - name: Restaurar Dependencias
+        run: dotnet restore ServiceDemo.slnx
+
       - name: Compilar Solución
         run: dotnet build ServiceDemo.slnx --no-restore --configuration Release
 
-      - name: Tests unitarios 
-        run: dotnet test ServiceDemo.slnx --no-build --configuration Release --verbosity normal
+      - name: Run Tests with Coverage
+        run: |
+          dotnet test ServiceDemo.slnx \
+            --no-build \
+            --configuration Release \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults
 
       - name: Restore local tools (Stryker)
         run: dotnet tool restore
@@ -46,6 +69,11 @@ jobs:
       - name: Ejecutar Mutation Testing (Stryker)
         working-directory: tests/ServiceDemo.Tests
         run: dotnet stryker
+
+      - name: End Sonar Analysis
+        run: |
+          dotnet sonarscanner end \
+            /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
       
       - name: Google Auth
         uses: google-github-actions/auth@v2
