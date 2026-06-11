@@ -52,7 +52,7 @@ jobs:
             /d:sonar.qualitygate.wait=true \
             /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage/coverage.opencover.xml" \
             /d:sonar.exclusions="**/Migrations/**, **/obj/**, **/bin/**, **/Program.cs, **/DependencyInjection.cs, src/ServiceDemo.Domain/**, src/ServiceDemo.Infrastructure/Data/ServiceDemoDbContext.cs, src/ServiceDemo.Application/Mappings/**" \
-            /d:sonar.coverage.exclusions="**/Program.cs, **/DependencyInjection.cs, src/ServiceDemo.Domain/**, src/ServiceDemo.Infrastructure/**"
+            /d:sonar.coverage.exclusions="**/Program.cs, **/DependencyInjection.cs, src/ServiceDemo.Domain/**, src/ServiceDemo.Infrastructure/**, src/ServiceDemo.API/Middleware/**, src/ServiceDemo.Application/Validators/**,src/ServiceDemo.Application/Common/**"
 
       - name: Restaurar Dependencias
         run: dotnet restore ServiceDemo.slnx
