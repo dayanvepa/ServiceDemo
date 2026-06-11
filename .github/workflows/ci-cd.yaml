@@ -10,8 +10,8 @@ env:
   REGION: us-central1
   SERVICE_NAME: mi-app
   REPOSITORY: mi-app
-  SONAR_PROJECT_KEY: dayanvepa_ServiceDemo
-  SONAR_ORGANIZATION: lego1300
+  SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+  SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
 
 jobs:
   # --- PARTE DE CI ---
