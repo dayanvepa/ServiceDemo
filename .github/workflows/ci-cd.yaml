@@ -12,6 +12,7 @@ env:
   REPOSITORY: mi-app
   SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
   SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
 jobs:
   # --- PARTE DE CI ---
@@ -46,7 +47,7 @@ jobs:
           dotnet sonarscanner begin \
             /k:"${{ env.SONAR_PROJECT_KEY }}" \
             /o:"${{ env.SONAR_ORGANIZATION }}" \
-            /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
+            /d:sonar.token= "$SONAR_TOKEN" \
             /d:sonar.host.url="https://sonarcloud.io" \
             /d:sonar.qualitygate.wait=true \
             /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage/coverage.opencover.xml" \
@@ -79,7 +80,7 @@ jobs:
           ls -la ./TestResults/coverage/
 
       - name: End Sonar Analysis
-        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+        run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
       - name: Google Auth
         uses: google-github-actions/auth@v2
