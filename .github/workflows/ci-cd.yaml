@@ -65,13 +65,17 @@ jobs:
             --configuration Release \
             --collect:"XPlat Code Coverage" \
             --results-directory ./TestResults \
-            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover \
-               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.OutputDirectory=./TestResults/coverage
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
-      - name: Verificar archivo de cobertura
+      - name: Verificar y mover archivo de cobertura
         run: |
-          echo "Buscando archivos de cobertura..."
+          echo "Archivos encontrados:"
           find ./TestResults -name "*.xml" -type f
+          # Mover el archivo a la ruta esperada por Sonar
+          mkdir -p ./TestResults/coverage
+          find ./TestResults -name "coverage.opencover.xml" -exec cp {} ./TestResults/coverage/coverage.opencover.xml \;
+          echo "Archivo copiado:"
+          ls -la ./TestResults/coverage/
 
       - name: End Sonar Analysis
         run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
