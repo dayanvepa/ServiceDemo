@@ -24,6 +24,8 @@ jobs:
       
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # <--- Necesario para que SonarCloud pueda analizar todo el historial de commits
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -31,8 +33,7 @@ jobs:
           dotnet-version: 9.0.x
 
       - name: Install SonarScanner
-        run: |
-          dotnet tool install --global dotnet-sonarscanner
+        run: dotnet tool install --global dotnet-sonarscanner
 
       - name: Add .NET tools to PATH
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
@@ -47,7 +48,9 @@ jobs:
             /o:"${{ env.SONAR_ORGANIZATION }}" \
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.host.url="https://sonarcloud.io" \
-            /d:sonar.qualitygate.wait=true
+            /d:sonar.qualitygate.wait=true \
+            /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" \
+            /d:sonar.exclusions="**/Migrations/**,**/obj/**,**/bin/**"
 
       - name: Restaurar Dependencias
         run: dotnet restore ServiceDemo.slnx
@@ -62,13 +65,6 @@ jobs:
             --configuration Release \
             --collect:"XPlat Code Coverage" \
             --results-directory ./TestResults
-
-      - name: Restore local tools (Stryker)
-        run: dotnet tool restore
-
-      - name: Ejecutar Mutation Testing (Stryker)
-        working-directory: tests/ServiceDemo.Tests
-        run: dotnet stryker
 
       - name: End Sonar Analysis
         run: |

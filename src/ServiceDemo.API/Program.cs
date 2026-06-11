@@ -18,13 +18,12 @@ Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console()
-    .WriteTo.File("logs/ServiceDemo-.txt", rollingInterval: RollingInterval.Day)
-    .CreateLogger();
+    .CreateLogger(); //
 
 builder.Host.UseSerilog();
 
 Log.Information("Starting ServiceDemo.API...");
-// Add services to the container
+
 builder.Services.AddControllers();
 
 // Infrastructure
@@ -41,12 +40,8 @@ builder.Services.AddValidatorsFromAssemblyContaining<CreateProductValidator>();
 builder.Services.AddValidatorsFromAssemblyContaining<UpdateProductValidator>();
 builder.Services.AddFluentValidationAutoValidation();
 
-
 builder.Services.AddOpenApi();
-
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-
 
 // CORS
 builder.Services.AddCors(options =>
@@ -59,32 +54,41 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Health checks
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
-{    
-    app.MapOpenApi();
-    app.MapScalarApiReference();
-}
+// Pipeline
+app.MapOpenApi();
+app.MapScalarApiReference();
 
-app.UseHttpsRedirection();
+
 
 app.UseCors("AllowAll");
-
-// Custom middleware
 app.UseMiddleware<GlobalExceptionMiddleware>();
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
-// Ensure database is created
+// Health check endpoint
+app.MapHealthChecks("/health");
+
+// 
 using (var scope = app.Services.CreateScope())
 {
-    var context = scope.ServiceProvider.GetRequiredService<ServiceDemo.Infrastructure.Data.ServiceDemoDbContext>();
-    context.Database.EnsureCreated();
+    try
+    {
+        var context = scope.ServiceProvider
+            .GetRequiredService<ServiceDemo.Infrastructure.Data.ServiceDemoDbContext>();
+        context.Database.EnsureCreated();
+        Log.Information("Database connection successful.");
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Could not connect to database on startup. The app will continue.");
+        
+    }
 }
 
 app.Run();
