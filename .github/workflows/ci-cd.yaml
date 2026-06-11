@@ -21,11 +21,11 @@ jobs:
       contents: 'read'
       id-token: 'write'
     steps:
-      
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # <--- Necesario para que SonarCloud pueda analizar todo el historial de commits
+          fetch-depth: 0  # Necesario para sonar-scanner que requiere el historial completo
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -38,7 +38,7 @@ jobs:
       - name: Add .NET tools to PATH
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
-      - name: limpiar Solución
+      - name: Limpiar Solución
         run: dotnet clean ServiceDemo.slnx --configuration Release
 
       - name: Begin Sonar Analysis
@@ -49,7 +49,7 @@ jobs:
             /d:sonar.token="${{ secrets.SONAR_TOKEN }}" \
             /d:sonar.host.url="https://sonarcloud.io" \
             /d:sonar.qualitygate.wait=true \
-            /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml" \
+            /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage/coverage.opencover.xml" \
             /d:sonar.exclusions="**/Migrations/**,**/obj/**,**/bin/**"
 
       - name: Restaurar Dependencias
@@ -64,13 +64,18 @@ jobs:
             --no-build \
             --configuration Release \
             --collect:"XPlat Code Coverage" \
-            --results-directory ./TestResults
+            --results-directory ./TestResults \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover \
+               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.OutputDirectory=./TestResults/coverage
+
+      - name: Verificar archivo de cobertura
+        run: |
+          echo "Buscando archivos de cobertura..."
+          find ./TestResults -name "*.xml" -type f
 
       - name: End Sonar Analysis
-        run: |
-          dotnet sonarscanner end \
-            /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
-      
+        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+
       - name: Google Auth
         uses: google-github-actions/auth@v2
         with:
@@ -86,16 +91,17 @@ jobs:
 
   # --- PARTE DE CD ---
   cd:
-    needs: ci # <---  evalúa que el CI esté completo y exitoso
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # <--- evalúa que sea el push a main
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
-    
+
       - name: Google Auth
         uses: google-github-actions/auth@v2
         with:
