@@ -6,7 +6,7 @@ on:
       - main
     tags:
       - 'v*.*.*'
-
+  
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
   REGION: us-central1
@@ -37,16 +37,20 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
+      # SonarCloud solo corre en push a ramas y pull_request (NO en tags)
       - name: Install SonarScanner
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: dotnet tool install --global dotnet-sonarscanner
 
       - name: Add .NET tools to PATH
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: echo "$HOME/.dotnet/tools" >> $GITHUB_PATH
 
       - name: Limpiar Solución
         run: dotnet clean ServiceDemo.slnx --configuration Release
 
       - name: Begin Sonar Analysis
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: |
           dotnet sonarscanner begin \
             /k:"${{ env.SONAR_PROJECT_KEY }}" \
@@ -55,8 +59,8 @@ jobs:
             /d:sonar.host.url="https://sonarcloud.io" \
             /d:sonar.qualitygate.wait=true \
             /d:sonar.cs.opencover.reportsPaths="./TestResults/coverage/coverage.opencover.xml" \
-            /d:sonar.exclusions="**/Migrations/**, **/obj/**, **/bin/**, **/Program.cs, **/DependencyInjection.cs, src/ServiceDemo.Domain/**, src/ServiceDemo.Infrastructure/Data/ServiceDemoDbContext.cs, src/ServiceDemo.Application/Mappings/**" \
-            /d:sonar.coverage.exclusions="**/Program.cs, **/DependencyInjection.cs, src/ServiceDemo.Domain/**, src/ServiceDemo.Infrastructure/**, src/ServiceDemo.API/Middleware/**, src/ServiceDemo.Application/Validators/**,src/ServiceDemo.Application/Common/**"
+            /d:sonar.exclusions="**/Migrations/**,**/obj/**,**/bin/**,**/Program.cs,**/DependencyInjection.cs,src/ServiceDemo.Domain/**,src/ServiceDemo.Infrastructure/Data/ServiceDemoDbContext.cs,src/ServiceDemo.Application/Mappings/**" \
+            /d:sonar.coverage.exclusions="**/Program.cs,**/DependencyInjection.cs,src/ServiceDemo.Domain/**,src/ServiceDemo.Infrastructure/**,src/ServiceDemo.API/Middleware/**,src/ServiceDemo.Application/Validators/**,src/ServiceDemo.Application/Common/**"
 
       - name: Restaurar Dependencias
         run: dotnet restore ServiceDemo.slnx
@@ -83,9 +87,12 @@ jobs:
           ls -la ./TestResults/coverage/
 
       - name: End Sonar Analysis
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: dotnet sonarscanner end /d:sonar.token="${{ env.SONAR_TOKEN }}"
 
+      # Build y push de imagen solo en push (no en pull_request)
       - name: Google Auth
+        if: github.event_name == 'push'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
@@ -95,6 +102,7 @@ jobs:
       # - Si es un tag v1.2.3 → usa "1.2.3"
       # - Si es un push normal → usa el SHA del commit
       - name: Calcular versión semántica
+        if: github.event_name == 'push'
         id: version
         run: |
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
@@ -110,6 +118,7 @@ jobs:
           echo "Versión calculada: $VERSION (release: $IS_RELEASE)"
 
       - name: Build and Push Container
+        if: github.event_name == 'push'
         run: |
           BASE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
           VERSION="${{ steps.version.outputs.version }}"
@@ -117,7 +126,6 @@ jobs:
 
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
 
-          # Build y push con la versión calculada
           docker build -t $BASE_URL:$VERSION .
           docker push $BASE_URL:$VERSION
 
@@ -154,6 +162,16 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
+      # Obtener revisión activa antes de desplegar (para rollback)
+      - name: Obtener revisión activa actual
+        id: current_revision
+        run: |
+          REVISION=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --format="value(status.traffic[0].revisionName)" 2>/dev/null || echo "")
+          echo "revision=$REVISION" >> $GITHUB_OUTPUT
+          echo " Revisión activa actual: $REVISION"
+
       # Recalcula la misma versión usada en CI para referenciar la imagen correcta
       - name: Calcular versión para deploy
         id: version
@@ -168,6 +186,7 @@ jobs:
           echo "Desplegando versión: $VERSION"
 
       - name: Deploy to Cloud Run
+        id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ env.SERVICE_NAME }}
@@ -177,7 +196,45 @@ jobs:
           secrets: |
             ConnectionStrings__DefaultConnection=connection-string:latest
 
+      # Verificar salud del nuevo deploy (5 intentos cada 10s)
+      - name: Verificar salud del deploy
+        id: health_check
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --format="value(status.url)")
+
+          echo "Verificando salud en: $SERVICE_URL/health"
+
+          for i in {1..5}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health" || echo "000")
+            echo "Intento $i — HTTP $STATUS"
+            if [ "$STATUS" = "200" ]; then
+              echo "healthy=true" >> $GITHUB_OUTPUT
+              echo "✅ Servicio saludable"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "healthy=false" >> $GITHUB_OUTPUT
+          echo "❌ Servicio no responde correctamente"
+          exit 1
+
+      # Rollback automático si el health check falla
+      - name: Rollback automático si falla
+        if: failure() && steps.current_revision.outputs.revision != ''
+        run: |
+          PREV_REVISION="${{ steps.current_revision.outputs.revision }}"
+          echo "Deploy fallido. Haciendo rollback a: $PREV_REVISION"
+
+          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --to-revisions=$PREV_REVISION=100
+
+          echo " Rollback completado. Tráfico restaurado a $PREV_REVISION"
+
       - name: Show Service URL
         run: |
-          echo "Deployed at: $(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')"
-          echo "Image version: ${{ steps.version.outputs.version }}"
+          echo " Deployed at: $(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')"
+          echo " Image version: ${{ steps.version.outputs.version }}"
