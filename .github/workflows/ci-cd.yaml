@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - 'v*.*.*'
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -15,7 +17,9 @@ env:
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
 jobs:
-  # --- PARTE DE CI ---
+  # ─────────────────────────────────────────
+  # JOB: CI — Integración Continua
+  # ─────────────────────────────────────────
   ci:
     runs-on: ubuntu-latest
     permissions:
@@ -73,7 +77,6 @@ jobs:
         run: |
           echo "Archivos encontrados:"
           find ./TestResults -name "*.xml" -type f
-          # Mover el archivo a la ruta esperada por Sonar
           mkdir -p ./TestResults/coverage
           find ./TestResults -name "coverage.opencover.xml" -exec cp {} ./TestResults/coverage/coverage.opencover.xml \;
           echo "Archivo copiado:"
@@ -88,17 +91,51 @@ jobs:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
           service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
 
+      # Calcula la versión:
+      # - Si es un tag v1.2.3 → usa "1.2.3"
+      # - Si es un push normal → usa el SHA del commit
+      - name: Calcular versión semántica
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+            IS_RELEASE="true"
+          else
+            VERSION="${{ github.sha }}"
+            IS_RELEASE="false"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_release=$IS_RELEASE" >> $GITHUB_OUTPUT
+          echo "Versión calculada: $VERSION (release: $IS_RELEASE)"
+
       - name: Build and Push Container
         run: |
-          IMAGE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
-          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
-          docker build -t $IMAGE_URL .
-          docker push $IMAGE_URL
+          BASE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          IS_RELEASE="${{ steps.version.outputs.is_release }}"
 
-  # --- PARTE DE CD ---
+          gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+          # Build y push con la versión calculada
+          docker build -t $BASE_URL:$VERSION .
+          docker push $BASE_URL:$VERSION
+
+          # Si es release semántico (vX.Y.Z), también publicar como :latest
+          if [ "$IS_RELEASE" = "true" ]; then
+            docker tag $BASE_URL:$VERSION $BASE_URL:latest
+            docker push $BASE_URL:latest
+            echo "Publicado como $VERSION y latest"
+          else
+            echo "Publicado como $VERSION (SHA)"
+          fi
+
+  # ─────────────────────────────────────────
+  # JOB: CD — Despliegue Continuo
+  # ─────────────────────────────────────────
   cd:
     needs: ci
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
@@ -117,12 +154,25 @@ jobs:
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
 
+      # Recalcula la misma versión usada en CI para referenciar la imagen correcta
+      - name: Calcular versión para deploy
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="${{ github.sha }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Desplegando versión: $VERSION"
+
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.REGION }}
-          image: "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ github.sha }}"
+          image: "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}"
           flags: '--allow-unauthenticated'
           secrets: |
             ConnectionStrings__DefaultConnection=connection-string:latest
@@ -130,3 +180,4 @@ jobs:
       - name: Show Service URL
         run: |
           echo "Deployed at: $(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')"
+          echo "Image version: ${{ steps.version.outputs.version }}"
