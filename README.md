@@ -123,6 +123,7 @@ ServiceDemo/
 ```text
   EVENTO GITHUB                JOBS
  ───────────────         ─────────────────────────────────────────
+ [Pull Request]  ───▶ [CI: Build + Test + Sonar]
  [Push main]     ───▶ [CI]
                          ├── 1. Checkout del código
                          ├── 2. Setup .NET 9
