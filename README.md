@@ -123,6 +123,7 @@ ServiceDemo/
 ```text
   EVENTO GITHUB                JOBS
  ───────────────         ─────────────────────────────────────────
+ [Pull Request]  ───▶ [CI: Build + Test + Sonar]
  [Push main]     ───▶ [CI]
                          ├── 1. Checkout del código
                          ├── 2. Setup .NET 9
@@ -393,7 +394,15 @@ Construye la imagen Docker usando el `Dockerfile` del repositorio y la publica e
 
 ---
 
-###  Evidencia — CI en push a `main`
+###  Evidencia — CI pull request a `main`
+
+<div align="center">
+  <img src="docs/img/ci-pull-request-to-main.png" alt="CI Pipeline - Pull request a main" width="800">
+</div>
+
+---
+
+###  Evidencia — CI push a `main`
 
 <div align="center">
   <img src="docs/img/ci-push-main.png" alt="CI Pipeline - Push a main" width="800">
@@ -401,7 +410,7 @@ Construye la imagen Docker usando el `Dockerfile` del repositorio y la publica e
 
 ---
 
-###  Evidencia — CI en push de tag `v*.*.*`
+###  Evidencia — CI push de tag `v*.*.*`
 
 <div align="center">
   <img src="docs/img/ci-push-tag.png" alt="CI Pipeline - Push de tag" width="800">
@@ -577,7 +586,7 @@ Imprime en los logs del pipeline la URL pública del servicio desplegado y la ve
 ---
 
 
-###  Evidencia — CD en push a `main`
+###  Evidencia — CD push a `main`
 
 <div align="center">
   <img src="docs/img/cd-push-main.png" alt="CD Pipeline - Push a main" width="800">
@@ -585,7 +594,7 @@ Imprime en los logs del pipeline la URL pública del servicio desplegado y la ve
 
 ---
 
-###  Evidencia — CD en push de tag `v*.*.*`
+###  Evidencia — CD push de tag `v*.*.*`
 
 <div align="center">
   <img src="docs/img/cd-push-tag.png" alt="CD Pipeline - Push de tag" width="800">
@@ -771,7 +780,7 @@ El proyecto usa un **multi-stage build** para optimizar el tamaño de la imagen 
 ###  Evidencia — Fallo en Escaneo de Calidad Estática
 
 <div align="center">
-  <img src="docs/img/ci-push-main-fail-sonar.png" alt="CD Pipeline - Push de tag" width="800">
+  <img src="docs/img/ci-push-main-fail-sonar.png" alt="CI push main fallo sonar" width="800">
 </div>
 
 >  El pipeline se detiene automáticamente si no se cumple con el mínimo de cobertura (80%) o si existen vulnerabilidades críticas para el ccodigo nuevo.
