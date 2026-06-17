@@ -27,6 +27,7 @@ jobs:
     permissions:
       contents: 'read'
       id-token: 'write'
+      security-events: write
     steps:
 
       - name: Checkout
@@ -119,25 +120,59 @@ jobs:
           echo "is_release=$IS_RELEASE" >> $GITHUB_OUTPUT
           echo "Versión calculada: $VERSION (release: $IS_RELEASE)"
 
-      - name: Build and Push Container
+      - name: Build Local Image
+        if: github.event_name == 'push'
+        run: |
+          docker build -t local_image_to_scan:${{ steps.version.outputs.version }} .
+
+      # ── Escaneo de vulnerabilidades con Trivy (instalación manual verificada) ──
+      - name: Install Trivy
+        if: github.event_name == 'push'
+        run: |
+          TRIVY_VERSION="0.71.1"
+          DEB_FILE="trivy_${TRIVY_VERSION}_Linux-64bit.deb"
+          CHECKSUMS="trivy_${TRIVY_VERSION}_checksums.txt"
+          
+          echo "Descargando Trivy v${TRIVY_VERSION}..."
+          # Añadimos --max-redirect=0 para evitar redirecciones maliciosas
+          wget -q --max-redirect=0 "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${DEB_FILE}"
+          wget -q --max-redirect=0 "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${CHECKSUMS}"
+          
+          echo "Verificando integridad del paquete..."
+          # Esta línea es la que realmente protege tu seguridad, ya que valida el archivo contra el hash oficial
+          grep "${DEB_FILE}" "${CHECKSUMS}" | sha256sum -c -
+          
+          echo "Instalando Trivy..."
+          sudo dpkg -i "${DEB_FILE}"
+          
+          rm -f "${DEB_FILE}" "${CHECKSUMS}"
+
+      - name: Scan Docker image with Trivy
+        if: github.event_name == 'push'
+        run: |
+          echo "Iniciando escaneo de vulnerabilidades..."
+          trivy image \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --scanners vuln \
+            --exit-code 1 \
+            --format table \
+            local_image_to_scan:${{ steps.version.outputs.version }}
+
+      - name: Push Container to Artifact Registry
         if: github.event_name == 'push'
         run: |
           BASE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
           VERSION="${{ steps.version.outputs.version }}"
-          IS_RELEASE="${{ steps.version.outputs.is_release }}"
-
+          
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
-
-          docker build -t $BASE_URL:$VERSION .
+          
+          docker tag local_image_to_scan:$VERSION $BASE_URL:$VERSION
           docker push $BASE_URL:$VERSION
-
-          # Si es release semántico (vX.Y.Z), también publicar como :latest
-          if [ "$IS_RELEASE" = "true" ]; then
+          
+          if [ "${{ steps.version.outputs.is_release }}" = "true" ]; then
             docker tag $BASE_URL:$VERSION $BASE_URL:latest
             docker push $BASE_URL:latest
-            echo "Publicado como $VERSION y latest"
-          else
-            echo "Publicado como $VERSION (SHA)"
           fi
 
   # ─────────────────────────────────────────
