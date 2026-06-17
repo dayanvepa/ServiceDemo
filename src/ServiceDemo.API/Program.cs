@@ -33,7 +33,10 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<IProductService, ProductService>();
 
 // AutoMapper
-builder.Services.AddAutoMapper(typeof(MappingProfile));
+builder.Services.AddAutoMapper(cfg =>
+{
+    cfg.AddProfile<MappingProfile>();
+});
 
 // FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<CreateProductValidator>();
