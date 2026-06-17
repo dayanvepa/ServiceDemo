@@ -134,18 +134,18 @@ jobs:
           CHECKSUMS="trivy_${TRIVY_VERSION}_checksums.txt"
           
           echo "Descargando Trivy v${TRIVY_VERSION}..."
-          wget -q "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${DEB_FILE}"
-          wget -q "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${CHECKSUMS}"
+          # Añadimos --max-redirect=0 para evitar redirecciones maliciosas
+          wget -q --max-redirect=0 "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${DEB_FILE}"
+          wget -q --max-redirect=0 "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${CHECKSUMS}"
           
           echo "Verificando integridad del paquete..."
+          # Esta línea es la que realmente protege tu seguridad, ya que valida el archivo contra el hash oficial
           grep "${DEB_FILE}" "${CHECKSUMS}" | sha256sum -c -
           
           echo "Instalando Trivy..."
           sudo dpkg -i "${DEB_FILE}"
           
-          echo "Limpiando archivos temporales..."
           rm -f "${DEB_FILE}" "${CHECKSUMS}"
-          trivy version
 
       - name: Scan Docker image with Trivy
         if: github.event_name == 'push'
