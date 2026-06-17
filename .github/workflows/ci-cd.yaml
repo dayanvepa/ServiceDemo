@@ -128,14 +128,14 @@ jobs:
       # Escaneo con Trivy
       - name: Run Trivy vulnerability scanner
         if: github.event_name == 'push'
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd8afcd237f223ee903cc5d8328d15cc04e  # v0.36.0
         with:
           image-ref: 'local_image_to_scan:${{ steps.version.outputs.version }}'
           format: 'table'
-          exit-code: '1' # Falla el pipeline si encuentra vulnerabilidades
+          exit-code: '1'
           ignore-unfixed: true
           vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH' # Escaneamos ambos por seguridad
+          severity: 'CRITICAL,HIGH' 
 
       - name: Push Container to Artifact Registry
         if: github.event_name == 'push'
