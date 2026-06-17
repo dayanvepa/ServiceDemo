@@ -129,22 +129,33 @@ jobs:
       - name: Install Trivy
         if: github.event_name == 'push'
         run: |
+          set -euo pipefail
+
           TRIVY_VERSION="0.71.1"
           DEB_FILE="trivy_${TRIVY_VERSION}_Linux-64bit.deb"
           CHECKSUMS="trivy_${TRIVY_VERSION}_checksums.txt"
-          
+          BASE_URL="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
+
           echo "Descargando Trivy v${TRIVY_VERSION}..."
-          wget -q --max-redirect=0 "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${DEB_FILE}"
-          wget -q --max-redirect=0 "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${CHECKSUMS}"
-          
+          curl -fsSL --location \
+            --proto '=https' --proto-redir '=https' \
+            --retry 3 --retry-all-errors \
+            -o "${DEB_FILE}" "${BASE_URL}/${DEB_FILE}"
+
+          curl -fsSL --location \
+            --proto '=https' --proto-redir '=https' \
+            --retry 3 --retry-all-errors \
+            -o "${CHECKSUMS}" "${BASE_URL}/${CHECKSUMS}"
+
           echo "Verificando integridad del paquete..."
-          sha256sum -c "${CHECKSUMS}" | grep "${DEB_FILE}"
+          grep -F " ${DEB_FILE}" "${CHECKSUMS}" | sha256sum -c -
           
           echo "Instalando Trivy..."
           sudo dpkg -i "${DEB_FILE}"
           
           rm -f "${DEB_FILE}" "${CHECKSUMS}"
-
+          trivy version
+          
       - name: Scan Docker image with Trivy
         if: github.event_name == 'push'
         run: |
