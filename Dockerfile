@@ -35,7 +35,7 @@ ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 
 # 6. Copiar archivos con el dueño correcto (appuser)
-COPY --from=build --chown=appuser:appgroup /app/publish .
+COPY --from=build /app/publish .
 
 # 7. Cambiar al usuario no privilegiado
 USER appuser
