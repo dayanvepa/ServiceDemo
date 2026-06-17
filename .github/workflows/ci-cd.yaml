@@ -125,17 +125,39 @@ jobs:
         run: |
           docker build -t local_image_to_scan:${{ steps.version.outputs.version }} .
 
-      # Escaneo con Trivy
-      - name: Run Trivy vulnerability scanner
+      # ── Escaneo de vulnerabilidades con Trivy (instalación manual verificada) ──
+      - name: Install Trivy
         if: github.event_name == 'push'
-        uses: aquasecurity/trivy-action@ed142fd8afcd237f223ee903cc5d8328d15cc04e  # v0.36.0
-        with:
-          image-ref: 'local_image_to_scan:${{ steps.version.outputs.version }}'
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH' 
+        run: |
+          TRIVY_VERSION="0.71.1"
+          DEB_FILE="trivy_${TRIVY_VERSION}_Linux-64bit.deb"
+          CHECKSUMS="trivy_${TRIVY_VERSION}_checksums.txt"
+          
+          echo "Descargando Trivy v${TRIVY_VERSION}..."
+          wget -q "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${DEB_FILE}"
+          wget -q "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/${CHECKSUMS}"
+          
+          echo "Verificando integridad del paquete..."
+          grep "${DEB_FILE}" "${CHECKSUMS}" | sha256sum -c -
+          
+          echo "Instalando Trivy..."
+          sudo dpkg -i "${DEB_FILE}"
+          
+          echo "Limpiando archivos temporales..."
+          rm -f "${DEB_FILE}" "${CHECKSUMS}"
+          trivy version
+
+      - name: Scan Docker image with Trivy
+        if: github.event_name == 'push'
+        run: |
+          echo "Iniciando escaneo de vulnerabilidades..."
+          trivy image \
+            --severity CRITICAL,HIGH \
+            --ignore-unfixed \
+            --scanners vuln \
+            --exit-code 1 \
+            --format table \
+            local_image_to_scan:${{ steps.version.outputs.version }}
 
       - name: Push Container to Artifact Registry
         if: github.event_name == 'push'
