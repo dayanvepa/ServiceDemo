@@ -27,6 +27,7 @@ jobs:
     permissions:
       contents: 'read'
       id-token: 'write'
+      security-events: write
     steps:
 
       - name: Checkout
@@ -119,25 +120,37 @@ jobs:
           echo "is_release=$IS_RELEASE" >> $GITHUB_OUTPUT
           echo "Versión calculada: $VERSION (release: $IS_RELEASE)"
 
-      - name: Build and Push Container
+      - name: Build Local Image
+        if: github.event_name == 'push'
+        run: |
+          docker build -t local_image_to_scan:${{ steps.version.outputs.version }} .
+
+      # Escaneo con Trivy
+      - name: Run Trivy vulnerability scanner
+        if: github.event_name == 'push'
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'local_image_to_scan:${{ steps.version.outputs.version }}'
+          format: 'table'
+          exit-code: '1' # Falla el pipeline si encuentra vulnerabilidades
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH' # Escaneamos ambos por seguridad
+
+      - name: Push Container to Artifact Registry
         if: github.event_name == 'push'
         run: |
           BASE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}"
           VERSION="${{ steps.version.outputs.version }}"
-          IS_RELEASE="${{ steps.version.outputs.is_release }}"
-
+          
           gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
-
-          docker build -t $BASE_URL:$VERSION .
+          
+          docker tag local_image_to_scan:$VERSION $BASE_URL:$VERSION
           docker push $BASE_URL:$VERSION
-
-          # Si es release semántico (vX.Y.Z), también publicar como :latest
-          if [ "$IS_RELEASE" = "true" ]; then
+          
+          if [ "${{ steps.version.outputs.is_release }}" = "true" ]; then
             docker tag $BASE_URL:$VERSION $BASE_URL:latest
             docker push $BASE_URL:latest
-            echo "Publicado como $VERSION y latest"
-          else
-            echo "Publicado como $VERSION (SHA)"
           fi
 
   # ─────────────────────────────────────────
