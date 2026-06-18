@@ -26,7 +26,9 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
 WORKDIR /app
 
 # PATCH: Actualizar librerías del sistema con fixes de seguridad
-RUN apk add --no-cache --upgrade libcrypto3 libssl3
+RUN apk add --no-cache --upgrade libcrypto3 libssl3 && \
+    addgroup -S appgroup && \
+    adduser -S appuser -G appgroup
 
 # 4. Implementar CIS Docker Benchmark 4.1: Crear usuario no root
 
