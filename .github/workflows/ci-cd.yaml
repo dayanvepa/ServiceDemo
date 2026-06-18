@@ -185,7 +185,7 @@ jobs:
           fi
 
   # ─────────────────────────────────────────
-  # JOB: CD — Despliegue Continuo
+  # JOB: CD — Despliegue Continuo en GKE
   # ─────────────────────────────────────────
   cd:
     needs: ci
@@ -199,7 +199,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Google Auth
+      - name: Google Auth (WIF)
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
@@ -207,18 +207,26 @@ jobs:
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          install_components: 'gke-gcloud-auth-plugin'
 
-      # Obtener revisión activa antes de desplegar (para rollback)
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: mi-cluster-autopilot
+          location: ${{ env.REGION }}
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      # Obtener revisión activa antes de desplegar (para rollback manual si falla)
       - name: Obtener revisión activa actual
         id: current_revision
         run: |
-          REVISION=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
-            --region=${{ env.REGION }} \
-            --format="value(status.traffic[0].revisionName)" 2>/dev/null || echo "")
+          REVISION=$(kubectl get deployment mi-app -o jsonpath='{.metadata.annotations.deployment\.kubernetes\.io/revision}' 2>/dev/null || echo "")
           echo "revision=$REVISION" >> $GITHUB_OUTPUT
-          echo " Revisión activa actual: $REVISION"
+          echo "Revisión actual del deployment: $REVISION"
 
-      # Recalcula la misma versión usada en CI para referenciar la imagen correcta
+      # Recalcula la misma versión usada en CI
       - name: Calcular versión para deploy
         id: version
         run: |
@@ -231,29 +239,40 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Desplegando versión: $VERSION"
 
-      - name: Deploy to Cloud Run
+      # ── DEPLOY TO GKE ──
+      - name: Deploy to GKE
         id: deploy
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ env.SERVICE_NAME }}
-          region: ${{ env.REGION }}
-          image: "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}"
-          flags: '--allow-unauthenticated'
-          secrets: |
-            ConnectionStrings__DefaultConnection=connection-string:latest
+        run: |
+          IMAGE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}"
+          echo "Imagen a desplegar: $IMAGE_URL"
 
-      # Verificar salud del nuevo deploy (5 intentos cada 10s)
+          # Reemplaza la variable en el manifest y aplica
+          sed -i "s|\${IMAGE_URL}|$IMAGE_URL|g" k8s/deployment.yaml
+          kubectl apply -f k8s/
+
+          # Espera a que el rollout termine
+          kubectl rollout status deployment/mi-app --timeout=180s
+
+      # Verificar salud del nuevo deploy
       - name: Verificar salud del deploy
         id: health_check
         run: |
-          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
-            --region=${{ env.REGION }} \
-            --format="value(status.url)")
+          # Obtener IP externa del LoadBalancer (puede tardar unos segundos)
+          for i in {1..10}; do
+            SERVICE_IP=$(kubectl get svc mi-app-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+            [ -n "$SERVICE_IP" ] && break
+            sleep 5
+          done
 
-          echo "Verificando salud en: $SERVICE_URL/health"
+          if [ -z "$SERVICE_IP" ]; then
+            echo "No se pudo obtener la IP del servicio"
+            exit 1
+          fi
+
+          echo "Verificando salud en: http://$SERVICE_IP/health"
 
           for i in {1..5}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$SERVICE_URL/health" || echo "000")
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://$SERVICE_IP/health" || echo "000")
             echo "Intento $i — HTTP $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "healthy=true" >> $GITHUB_OUTPUT
@@ -267,20 +286,16 @@ jobs:
           echo "❌ Servicio no responde correctamente"
           exit 1
 
-      # Rollback automático si el health check falla
+      # Rollback automático si falla
       - name: Rollback automático si falla
         if: failure() && steps.current_revision.outputs.revision != ''
         run: |
-          PREV_REVISION="${{ steps.current_revision.outputs.revision }}"
-          echo "Deploy fallido. Haciendo rollback a: $PREV_REVISION"
-
-          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
-            --region=${{ env.REGION }} \
-            --to-revisions=$PREV_REVISION=100
-
-          echo " Rollback completado. Tráfico restaurado a $PREV_REVISION"
+          echo "Deploy fallido. Haciendo rollback a revisión anterior..."
+          kubectl rollout undo deployment/mi-app
+          echo "Rollback completado."
 
       - name: Show Service URL
         run: |
-          echo " Deployed at: $(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')"
-          echo " Image version: ${{ steps.version.outputs.version }}"
+          SERVICE_IP=$(kubectl get svc mi-app-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "PENDIENTE")
+          echo "Deployed at: http://$SERVICE_IP"
+          echo "Image version: ${{ steps.version.outputs.version }}"

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mi-app
+  labels:
+    app: mi-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mi-app
+  template:
+    metadata:
+      labels:
+        app: mi-app
+    spec:
+      containers:
+      - name: mi-app
+        image: ${IMAGE_URL} # Se reemplaza en el pipeline
+        ports:
+        - containerPort: 8080
+        # Configuración de Probes para Observabilidad Nativa
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mi-app-service
+spec:
+  type: LoadBalancer # Esto nos dará la IP pública para Grafana/Cloud Monitoring
+  selector:
+    app: mi-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
