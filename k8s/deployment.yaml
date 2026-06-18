@@ -14,6 +14,9 @@ spec:
       labels:
         app: mi-app
     spec:
+      # FIX S6865: Deshabilitar automount del ServiceAccount token.
+      automountServiceAccountToken: false
+      
       containers:
       - name: mi-app
         image: ${IMAGE_URL} # Se reemplaza en el pipeline
@@ -36,16 +39,21 @@ spec:
           requests:
             cpu: "250m"
             memory: "512Mi"
+            # FIX S6897: Especificar storage request para scheduling correcto
+            ephemeral-storage: "1Gi"
           limits:
             cpu: "500m"
             memory: "1Gi"
+            # FIX S6897: Especificar storage limit para prevenir 
+            # consumo excesivo de disco del nodo (logs/temp)
+            ephemeral-storage: "2Gi"
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: mi-app-service
 spec:
-  type: LoadBalancer # Esto nos dará la IP pública para Grafana/Cloud Monitoring
+  type: LoadBalancer
   selector:
     app: mi-app
   ports:
