@@ -14,15 +14,18 @@ spec:
       labels:
         app: mi-app
     spec:
-      # FIX S6865: Deshabilitar automount del ServiceAccount token.
       automountServiceAccountToken: false
-      
       containers:
       - name: mi-app
-        image: ${IMAGE_URL} # Se reemplaza en el pipeline
+        image: ${IMAGE_URL}
         ports:
-        - containerPort: 8080
-        # Configuración de Probes para Observabilidad Nativa
+        - containerPort: 8080        
+        env:
+        - name: ConnectionStrings__DefaultConnection
+          valueFrom:
+            secretKeyRef:
+              name: connection-string-secret
+              key: ConnectionStrings__DefaultConnection
         livenessProbe:
           httpGet:
             path: /health
@@ -39,13 +42,10 @@ spec:
           requests:
             cpu: "250m"
             memory: "512Mi"
-            # FIX S6897: Especificar storage request para scheduling correcto
             ephemeral-storage: "1Gi"
           limits:
             cpu: "500m"
             memory: "1Gi"
-            # FIX S6897: Especificar storage limit para prevenir 
-            # consumo excesivo de disco del nodo (logs/temp)
             ephemeral-storage: "2Gi"
 ---
 apiVersion: v1
