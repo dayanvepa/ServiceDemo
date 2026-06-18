@@ -248,16 +248,17 @@ jobs:
           kubectl apply -f k8s/
           kubectl rollout status deployment/mi-app --timeout=180s
 
-      # FIX S5332: Health check interno sin usar http:// en el YAML.
+      
       # Se ejecuta wget dentro del propio pod (localhost), evitando tráfico claro por internet.
       - name: Verificar salud del deploy
         id: health_check
         run: |
-          echo "Esperando que los pods estén listos..."
-          kubectl wait --for=condition=ready pod -l app=mi-app --timeout=120s
-
-          POD_NAME=$(kubectl get pods -l app=mi-app -o jsonpath='{.items[0].metadata.name}')
-          echo "Verificando salud en pod: $POD_NAME (localhost:8080/health)"
+          # Obtener SOLO un pod que esté realmente en ejecución (excluye Terminating)
+          POD_NAME=$(kubectl get pods -l app=mi-app \
+            --field-selector=status.phase=Running \
+            -o jsonpath='{.items[0].metadata.name}')
+          
+          echo "Verificando salud en pod activo: $POD_NAME"
 
           for i in {1..5}; do
             if kubectl exec "$POD_NAME" -- wget -qO- localhost:8080/health >/dev/null 2>&1; then
