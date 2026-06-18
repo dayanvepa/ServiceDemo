@@ -21,12 +21,11 @@ RUN dotnet publish src/ServiceDemo.API/ServiceDemo.API.csproj \
     /p:UseAppHost=false
 
 # ── Etapa 2: Runtime (Seguro y Optimizado) ──────────────────
-# Usamos 'aspnet:9.0-alpine' para reducir la superficie de ataque y el tamaño de la imagen
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime
 WORKDIR /app
 
 #
-# 4. Implementar CIS Docker Benchmark 4.1: Crear usuario no root
+# 4. Implementar CIS Docker Benchmark 4.1
 RUN apk add --no-cache --upgrade \
     icu-libs \
     icu-data-full \
@@ -43,7 +42,7 @@ ENV ASPNETCORE_URLS=http://+:8080
 ENV ASPNETCORE_HTTP_PORTS=8080
 EXPOSE 8080
 
-# 6. Copiar archivos con el dueño correcto (appuser)
+# 6. Copiar archivos 
 COPY --from=build /app/publish .
 
 # 7. Cambiar al usuario no privilegiado
