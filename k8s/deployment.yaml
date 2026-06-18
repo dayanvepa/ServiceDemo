@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mi-app
+  labels:
+    app: mi-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mi-app
+  template:
+    metadata:
+      labels:
+        app: mi-app
+    spec:
+      # FIX S6865: Deshabilitar automount del ServiceAccount token.
+      automountServiceAccountToken: false
+      
+      containers:
+      - name: mi-app
+        image: ${IMAGE_URL} # Se reemplaza en el pipeline
+        ports:
+        - containerPort: 8080
+        # Configuración de Probes para Observabilidad Nativa
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+            # FIX S6897: Especificar storage request para scheduling correcto
+            ephemeral-storage: "1Gi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+            # FIX S6897: Especificar storage limit para prevenir 
+            # consumo excesivo de disco del nodo (logs/temp)
+            ephemeral-storage: "2Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mi-app-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: mi-app
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
