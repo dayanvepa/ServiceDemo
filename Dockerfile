@@ -27,10 +27,16 @@ WORKDIR /app
 
 #
 # 4. Implementar CIS Docker Benchmark 4.1: Crear usuario no root
-
-RUN apk add --no-cache --upgrade libcrypto3 libssl3 && \
+RUN apk add --no-cache --upgrade \
+    icu-libs \
+    icu-data-full \
+    libcrypto3 \
+    libssl3 && \
     addgroup -S appgroup && \
     adduser -S appuser -G appgroup
+
+# 4.1 Desactivar el modo invariante 
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 # 5. Configurar variables de entorno para puerto 8080
 ENV ASPNETCORE_URLS=http://+:8080
