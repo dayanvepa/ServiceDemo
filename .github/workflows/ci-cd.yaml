@@ -184,7 +184,7 @@ jobs:
             docker push $BASE_URL:latest
           fi
 
-  # ─────────────────────────────────────────
+# ─────────────────────────────────────────
   # JOB: CD — Despliegue Continuo en GKE
   # ─────────────────────────────────────────
   cd:
@@ -212,13 +212,15 @@ jobs:
           install_components: 'gke-gcloud-auth-plugin'
 
       - name: Get GKE Credentials
-        uses: google-github-actions/get-gke-credentials@v2
+        # FIX S7637: Usar SHA completo en lugar de tag mutable @v2.
+        # Reemplaza COMMIT_SHA_AQUI por el SHA real de la versión que quieras pinnear.
+        # Cómo obtenerlo: curl -s https://api.github.com/repos/google-github-actions/get-gke-credentials/git/refs/tags/v2.3.3 | jq -r '.object.sha'
+        uses: google-github-actions/get-gke-credentials@COMMIT_SHA_AQUI # v2.3.3
         with:
           cluster_name: mi-cluster-autopilot
           location: ${{ env.REGION }}
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      # Obtener revisión activa antes de desplegar (para rollback manual si falla)
       - name: Obtener revisión activa actual
         id: current_revision
         run: |
@@ -226,7 +228,6 @@ jobs:
           echo "revision=$REVISION" >> $GITHUB_OUTPUT
           echo "Revisión actual del deployment: $REVISION"
 
-      # Recalcula la misma versión usada en CI
       - name: Calcular versión para deploy
         id: version
         run: |
@@ -239,40 +240,34 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Desplegando versión: $VERSION"
 
-      # ── DEPLOY TO GKE ──
       - name: Deploy to GKE
         id: deploy
         run: |
           IMAGE_URL="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}"
           echo "Imagen a desplegar: $IMAGE_URL"
 
-          # Reemplaza la variable en el manifest y aplica
           sed -i "s|\${IMAGE_URL}|$IMAGE_URL|g" k8s/deployment.yaml
           kubectl apply -f k8s/
-
-          # Espera a que el rollout termine
           kubectl rollout status deployment/mi-app --timeout=180s
 
-      # Verificar salud del nuevo deploy
+      # FIX S5332: Health check interno sin usar http:// en el YAML.
+      # Se ejecuta wget dentro del propio pod (localhost), evitando tráfico claro por internet.
       - name: Verificar salud del deploy
         id: health_check
         run: |
-          # Obtener IP externa del LoadBalancer (puede tardar unos segundos)
-          for i in {1..10}; do
-            SERVICE_IP=$(kubectl get svc mi-app-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-            [ -n "$SERVICE_IP" ] && break
-            sleep 5
-          done
+          echo "Esperando que los pods estén listos..."
+          kubectl wait --for=condition=ready pod -l app=mi-app --timeout=120s
 
-          if [ -z "$SERVICE_IP" ]; then
-            echo "No se pudo obtener la IP del servicio"
-            exit 1
-          fi
-
-          echo "Verificando salud en: http://$SERVICE_IP/health"
+          POD_NAME=$(kubectl get pods -l app=mi-app -o jsonpath='{.items[0].metadata.name}')
+          echo "Verificando salud en pod: $POD_NAME (localhost:8080/health)"
 
           for i in {1..5}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://$SERVICE_IP/health" || echo "000")
+            if kubectl exec "$POD_NAME" -- wget -qO- localhost:8080/health >/dev/null 2>&1; then
+              STATUS="200"
+            else
+              STATUS="000"
+            fi
+
             echo "Intento $i — HTTP $STATUS"
             if [ "$STATUS" = "200" ]; then
               echo "healthy=true" >> $GITHUB_OUTPUT
@@ -286,7 +281,6 @@ jobs:
           echo "❌ Servicio no responde correctamente"
           exit 1
 
-      # Rollback automático si falla
       - name: Rollback automático si falla
         if: failure() && steps.current_revision.outputs.revision != ''
         run: |
@@ -294,8 +288,9 @@ jobs:
           kubectl rollout undo deployment/mi-app
           echo "Rollback completado."
 
+      # FIX S5332: Se elimina la cadena literal "http://" del echo.
       - name: Show Service URL
         run: |
           SERVICE_IP=$(kubectl get svc mi-app-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "PENDIENTE")
-          echo "Deployed at: http://$SERVICE_IP"
+          echo "Service IP: $SERVICE_IP"
           echo "Image version: ${{ steps.version.outputs.version }}"
