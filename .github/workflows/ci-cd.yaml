@@ -17,6 +17,7 @@ env:
   SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
   SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  MONITORING_CHANNEL_1: ${{ secrets.MONITORING_CHANNEL_1 }}
   CONCURRENCY: 40 # se cambia a 40 para mejorar el rendimiento sin saturar el servicio por defecto son 80
 
 jobs:
@@ -294,9 +295,9 @@ jobs:
           set -e
           cd monitoring/
 
-          sed -i "s|CHANNEL_PLACEHOLDER_1|${{ secrets.MONITORING_CHANNEL_1 }}|g" alert-errors.json
-          sed -i "s|CHANNEL_PLACEHOLDER_1|${{ secrets.MONITORING_CHANNEL_1 }}|g" alert-latency.json
-          sed -i "s|CHANNEL_PLACEHOLDER_1|${{ secrets.MONITORING_CHANNEL_1 }}|g" alert-availability.json
+          sed -i "s|CHANNEL_PLACEHOLDER_1|$MONITORING_CHANNEL_1|g" alert-errors.json
+          sed -i "s|CHANNEL_PLACEHOLDER_1|$MONITORING_CHANNEL_1|g" alert-latency.json
+          sed -i "s|CHANNEL_PLACEHOLDER_1|$MONITORING_CHANNEL_1|g" alert-availability.json
 
           DASH_DISPLAY_NAME=$(python3 -c "import json; print(json.load(open('dashboard.json'))['displayName'])")
           echo "Buscando Dashboard: '$DASH_DISPLAY_NAME'"
