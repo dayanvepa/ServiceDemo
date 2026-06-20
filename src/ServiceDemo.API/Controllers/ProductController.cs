@@ -130,5 +130,32 @@ namespace ServiceDemo.API.Controllers
 
             return BadRequest(result);
         }
+        // Endpoints para simular errores y retrasos
+        /// <summary>
+        /// Simulates a delayed response to test client-side timeout handling
+        /// </summary> <param name="delayMs">Delay in milliseconds</param>
+        /// <returns>Delayed response
+        [HttpGet("delay/{delayMs}")]
+        public async Task<IActionResult> SlowError(int delayMs)
+        {
+            await Task.Delay(delayMs); 
+
+              return Ok("Respuesta después de retraso simulado");
+        }
+        /// <summary>        /// Simulates an internal server error after a delay to test error handling
+        /// </summary>
+        /// <param name="delayMs">Delay in milliseconds before returning the error</param>
+        /// <returns>Internal server error response</returns>   
+        [HttpGet("error500/{delayMs}")]
+        public async Task<IActionResult> Error500(int delayMs)
+        {
+            await Task.Delay(delayMs); 
+            return StatusCode( StatusCodes.Status500InternalServerError,
+                new
+                {
+                    Message = "Error interno simulado"
+                });
+        }
+        
     }
 }
