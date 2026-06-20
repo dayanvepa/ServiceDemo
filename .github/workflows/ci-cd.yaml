@@ -17,6 +17,7 @@ env:
   SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
   SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  CONCURRENCY: 40 # se cambia a 40 para mejorar el rendimiento sin saturar el servicio
 
 jobs:
   # ─────────────────────────────────────────
@@ -238,7 +239,7 @@ jobs:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.REGION }}
           image: "${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.SERVICE_NAME }}:${{ steps.version.outputs.version }}"
-          flags: '--allow-unauthenticated'
+          flags: '--allow-unauthenticated --concurrency=${{ env.CONCURRENCY }}'
           secrets: |
             ConnectionStrings__DefaultConnection=connection-string:latest
 
