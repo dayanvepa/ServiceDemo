@@ -307,7 +307,9 @@ jobs:
             gcloud monitoring dashboards create --config-from-file=dashboard.json --project="${{ env.PROJECT_ID }}"
           else
             echo "Actualizando Dashboard: $DASH_ID"
-            gcloud monitoring dashboards update "$DASH_ID" --config-from-file=dashboard.json --project="${{ env.PROJECT_ID }}"
+            # Obtener el etag actual antes de actualizar
+            ETAG=$(gcloud monitoring dashboards describe "$DASH_ID" --project="${{ env.PROJECT_ID }}" --format="value(etag)")
+            gcloud monitoring dashboards update "$DASH_ID" --config-from-file=dashboard.json --etag="$ETAG" --project="${{ env.PROJECT_ID }}"
           fi
 
           for file in alert-errors.json alert-latency.json alert-availability.json; do
