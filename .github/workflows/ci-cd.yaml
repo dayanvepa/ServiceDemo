@@ -17,7 +17,7 @@ env:
   SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
   SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
   SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  CONCURRENCY: 40 # se cambia a 40 para mejorar el rendimiento sin saturar el servicio
+  CONCURRENCY: 40 # se cambia a 40 para mejorar el rendimiento sin saturar el servicio por defecto son 80
 
 jobs:
   # ─────────────────────────────────────────
