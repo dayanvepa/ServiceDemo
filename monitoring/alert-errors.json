@@ -19,5 +19,5 @@
   },
   "combiner": "OR",
   "enabled": true,
-  "notificationChannels": []
+  "notificationChannels": ["CHANNEL_PLACEHOLDER_1"]
 }
