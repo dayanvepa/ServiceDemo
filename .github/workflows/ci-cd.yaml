@@ -293,14 +293,20 @@ jobs:
         run: |
           cd monitoring/
 
-          echo "Crear o actualizar el Dashboard"
-          gcloud monitoring dashboards create \
-            --config-from-file=dashboard.json \
-            --project=${{ env.PROJECT_ID }} || echo "Dashboard ya existe."
+          echo "Desplegando Dashboard..."
+          gcloud monitoring dashboards create --config-from-file=dashboard.json --project=${{ env.PROJECT_ID }} || {
+            echo "El Dashboard ya existe, actualizando..."
+            DASH_NAME=$(gcloud monitoring dashboards list --project=${{ env.PROJECT_ID }} --filter="displayName='Dashboard SLIs - Proyecto NET'" --format="value(name)")
+            gcloud monitoring dashboards update $DASH_NAME --config-from-file=dashboard.json --project=${{ env.PROJECT_ID }}
+          }
 
-          echo "Crear o actualizar las Alert Policies"
+          echo "Desplegando Alert Policies..."
           for file in alert-errors.json alert-latency.json alert-availability.json; do
-            gcloud monitoring policies create \
-              --policy-from-file=$file \
-              --project=${{ env.PROJECT_ID }} || echo "La política $file ya existe."
+            POLICY_DISPLAY_NAME=$(grep -oP '"displayName":\s*"\K[^"]+' $file)
+            
+            gcloud monitoring policies create --policy-from-file=$file --project=${{ env.PROJECT_ID }} || {
+              echo "La política $file ya existe, actualizando..."
+              POLICY_NAME=$(gcloud monitoring policies list --project=${{ env.PROJECT_ID }} --filter="displayName='$POLICY_DISPLAY_NAME'" --format="value(name)")
+              gcloud monitoring policies update $POLICY_NAME --policy-from-file=$file --project=${{ env.PROJECT_ID }}
+            }
           done
