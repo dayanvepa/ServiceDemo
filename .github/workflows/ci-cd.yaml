@@ -284,3 +284,22 @@ jobs:
         run: |
           echo " Deployed at: $(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')"
           echo " Image version: ${{ steps.version.outputs.version }}"
+
+      # ─────────────────────────────────────────
+      # DEPLOY MONITORING (Dashboards and Alerts)
+      # ─────────────────────────────────────────
+      - name: Deploy Monitoring (Dashboards and Alerts)
+        run: |
+          cd monitoring/
+
+          echo "Crear o actualizar el Dashboard"
+          gcloud monitoring dashboards create \
+            --config-from-file=dashboard.json \
+            --project=${{ env.PROJECT_ID }} || echo "Dashboard ya existe."
+
+          echo "Crear o actualizar las Alert Policies"
+          for file in alert-errors.json alert-latency.json alert-availability.json; do
+            gcloud monitoring policies create \
+              --policy-from-file=$file \
+              --project=${{ env.PROJECT_ID }} || echo "La política $file ya existe."
+          done
