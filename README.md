@@ -596,8 +596,15 @@ Grafana está desplegado en Cloud Run con persistencia en **Cloud SQL PostgreSQL
 ###  Evidencia — Grafana Dashboard
 
 <div align="center">
-  <img src="docs/img/grafana-dashboard.png" alt="Grafana Dashboard" width="800">
+  <img src="docs/img/grafana-dashboard.png" alt="Grafana Dashboard:00- Service Demo - Metricas Basicas" width="800">
 </div>
+
+
+**URL base grafana:**
+
+```
+https://grafana-service-802338067803.us-central1.run.app/
+```
 
 
 ---
@@ -735,7 +742,7 @@ La estrategia de versiones implementada (SHA para commits de desarrollo, vX.Y.Z 
 | `/scalar/v1` | Documentación interactiva (Scalar UI) |
 | `/health` | Health check del servicio |
 
-**URL base en producción:**
+**URL base :**
 
 ```
 https://mi-app-omaolvi2za-uc.a.run.app/
