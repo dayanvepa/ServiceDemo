@@ -39,8 +39,9 @@
 - [Monitoreo y Observabilidad](#-monitoreo-y-observabilidad)
 - [Análisis de calidad con SonarCloud](#-análisis-de-calidad-con-sonarcloud)
 - [Dockerfile](#-dockerfile)
+- [Reflexión sobre Eficiencia Operativa](#-reflexión-sobre-eficiencia-operativa)
 - [Endpoints del servicio](#-endpoints-del-servicio)
-- [Comandos útiles](#-comandos-útiles)
+- [Referencias](#-referencias)
 
 ---
 
@@ -696,6 +697,36 @@ ENTRYPOINT ["dotnet", "ServiceDemo.API.dll"]
 >  Cloud Run requiere que la aplicación escuche en el puerto `8080`. Las variables `ASPNETCORE_URLS` y `ASPNETCORE_HTTP_PORTS` garantizan esto explícitamente.
 
 ---
+## Reflexión sobre Eficiencia Operativa
+
+La implementación de este pipeline CI/CD representó un cambio fundamental en la forma de entregar software: pasar de un proceso manual, propenso a errores y dependiente de intervención humana, a un flujo completamente automatizado que garantiza calidad, seguridad y disponibilidad en cada despliegue.
+
+### Automatización y velocidad de entrega
+
+Antes de implementar el pipeline, cada despliegue requería ejecutar manualmente los tests, construir la imagen Docker, subirla a un registro y actualizar el servicio en GCP. Con GitHub Actions, todo este proceso ocurre automáticamente en respuesta a un git push, reduciendo el tiempo de entrega de horas a minutos y eliminando la posibilidad de omitir pasos críticos por error humano.
+
+### Seguridad integrada desde el inicio (DevSecOps)
+
+La integración de SonarCloud y Trivy directamente en el pipeline convierte la seguridad en una parte no negociable del proceso de desarrollo. Ninguna imagen con vulnerabilidades CRITICAL o HIGH con fix disponible puede llegar a producción, ya que el pipeline falla automáticamente antes del push a Artifact Registry. Esto implementa el principio de "shift left security": detectar problemas lo más temprano posible en el ciclo de vida, cuando son más baratos y fáciles de corregir.
+
+### Resiliencia operativa
+
+El mecanismo de rollback automático implementado en el Job CD garantiza que un despliegue fallido no deje el servicio caído. Si el health check no obtiene respuesta HTTP 200 en cinco intentos, el tráfico se restaura automáticamente a la revisión anterior de Cloud Run. Esto reduce el tiempo de recuperación ante fallos (MTTR) sin intervención manual.
+
+### Observabilidad
+
+La combinación de Cloud Monitoring y Grafana proporciona visibilidad completa del comportamiento del servicio en producción. Las alertas automáticas permiten detectar degradaciones de rendimiento o errores antes de que los usuarios los reporten. Grafana, desplegado con persistencia en Cloud SQL, garantiza que los dashboards estén siempre disponibles y actualizados.
+
+### Versionamiento semántico
+
+La estrategia de versiones implementada (SHA para commits de desarrollo, vX.Y.Z para releases) permite trazabilidad completa: en cualquier momento es posible identificar exactamente qué versión del código está corriendo en producción y reproducir el entorno exacto de cualquier despliegue anterior.
+
+### Lecciones aprendidas
+- La autenticación mediante Workload Identity Federation elimina la necesidad de gestionar claves de servicio estáticas, reduciendo significativamente la superficie de ataque en el pipeline.
+- El uso de Secret Manager para inyectar la cadena de conexión en tiempo de ejecución garantiza que las credenciales nunca estén en el código ni en los logs del pipeline.
+- Separar el build local del push al registro, con el escaneo de Trivy en medio, es una práctica que evita publicar imágenes inseguras incluso si el escaneo falla inesperadamente.
+
+---
 
 ## 🌐 Endpoints del servicio
 
@@ -709,6 +740,17 @@ ENTRYPOINT ["dotnet", "ServiceDemo.API.dll"]
 ```
 https://mi-app-omaolvi2za-uc.a.run.app/
 ```
+
+---
+##  Referencias
+
+*   [GitHub Actions Documentation](https://docs.github.com/en/actions) - Guía oficial para la automatización de flujos de trabajo.
+*   [SonarCloud Documentation](https://docs.sonarcloud.io/) - Documentación para el análisis de calidad de código y Quality Gates.
+*   [Trivy Documentation](https://aquasecurity.github.io/trivy/) - Guía de escaneo de vulnerabilidades en contenedores y dependencias.
+*   [Google Cloud Run Documentation](https://cloud.google.com/run/docs) - Guías sobre despliegue, escalado y gestión de revisiones.
+*   [Google Cloud Monitoring](https://cloud.google.com/monitoring/docs) - Documentación para la recolección de métricas, creación de dashboards y alertas.
+*   [Grafana Documentation](https://grafana.com/docs/) - Guía de visualización de datos y configuración de data sources.
+*   [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) - Documentación sobre autenticación segura entre GitHub y GCP sin llaves de servicio.
 
 ---
 
