@@ -37,8 +37,8 @@
 - [Pipeline CD — Paso a paso](#-pipeline-cd--paso-a-paso)
 - [Seguridad del pipeline](#-seguridad-del-pipeline)
 - [Monitoreo y Observabilidad](#-monitoreo-y-observabilidad)
-- [Dockerfile](#-dockerfile)
 - [Análisis de calidad con SonarCloud](#-análisis-de-calidad-con-sonarcloud)
+- [Dockerfile](#-dockerfile)
 - [Endpoints del servicio](#-endpoints-del-servicio)
 - [Comandos útiles](#-comandos-útiles)
 
@@ -532,19 +532,6 @@ gcloud run services describe mi-app \
   <img src="docs/img/current-trivy-scan-report.png" alt="Reporte actual" width="800">
 </div>
 
-
-###  Evidencia — Scaneo de Sonarqube PullRequest
-
-<div align="center">
-  <img src="docs/img/ci-pull-request-to-main.png" alt="Scaneo sonaqube pull request" width="800">
-</div>
-
-###  Evidencia — Scaneo de Sonarqube 
-
-<div align="center">
-  <img src="docs/img/sonar-qube-scan.png" alt="Scaneo sonaqube" width="800">
-</div>
-
 ---
 
 ## 📊 Monitoreo y Observabilidad
@@ -562,21 +549,21 @@ El pipeline despliega automáticamente recursos de monitoreo en cada ejecución 
 
 ###  Evidencia — Cloud Monitoring
 
-<table style="width:100%; border-collapse:collapse;">
+<table style="width:100%;  border-collapse:collapse;">
   <tr>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="cloud-monitoring.png" alt="Dashboard SLIs" width="100%">
+      <img src="docs/img/cloud-monitoring.png" alt="Dashboard SLIs" width="100%">
     </td>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="cloud-minitoring-rate-alto.png" alt="Alerta 5xx" width="100%">
+      <img src="docs/img/cloud-minitoring-rate-alto.png" alt="Alerta 5xx" width="100%">
     </td>
   </tr>
   <tr>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="cloud-minitoring-tasa-exito.png" alt="Tasa de éxito baja" width="100%">
+      <img src="docs/img/cloud-minitoring-tasa-exito.png" alt="Tasa de éxito baja" width="100%">
     </td>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="cloud-monitoring-email.png" alt="Historial de correos" width="100%">
+      <img src="docs/img/cloud-monitoring-email.png" alt="Historial de correos" width="100%">
     </td>
   </tr>
 </table>
@@ -610,6 +597,57 @@ Grafana está desplegado en Cloud Run con persistencia en **Cloud SQL PostgreSQL
 <div align="center">
   <img src="docs/img/grafana-dashboard.png" alt="Grafana Dashboard" width="800">
 </div>
+
+
+---
+
+## 📊 Análisis de calidad con SonarCloud
+
+### Exclusiones configuradas
+
+#### `sonar.exclusions` — Excluye completamente del análisis
+
+| Patrón | Razón |
+|---|---|
+| `**/Migrations/**` | Código generado por Entity Framework |
+| `**/obj/**`, `**/bin/**` | Artefactos de compilación |
+| `**/Program.cs` | Punto de entrada, sin lógica de negocio |
+| `**/DependencyInjection.cs` | Solo registro de servicios |
+| `src/ServiceDemo.Domain/**` | Entidades y POCOs sin lógica |
+| `ServiceDemoDbContext.cs` | Configuración de EF Core |
+| `src/ServiceDemo.Application/Mappings/**` | Perfiles de AutoMapper |
+
+#### `sonar.coverage.exclusions` — Excluye solo del cálculo de cobertura
+
+| Patrón | Razón |
+|---|---|
+| `src/ServiceDemo.Infrastructure/**` | Requiere DB real o mocks complejos |
+| `src/ServiceDemo.API/**` | Requiere integration tests |
+| `src/ServiceDemo.Application/Validators/**` | Validaciones de FluentValidation |
+| `src/ServiceDemo.Application/Common/**` | Clases de utilidad |
+
+### Diferencia clave
+
+```text
+sonar.exclusions          → El archivo NO aparece en SonarCloud
+sonar.coverage.exclusions → El archivo SÍ aparece, pero NO cuenta en el % de cobertura
+```
+
+
+
+###  Evidencia — Scaneo de Sonarqube PullRequest
+
+<div align="center">
+  <img src="docs/img/ci-pull-request-to-main.png" alt="Scaneo sonaqube pull request" width="800">
+</div>
+
+###  Evidencia — Scaneo de Sonarqube 
+
+<div align="center">
+  <img src="docs/img/sonar-qube-scan.png" alt="Scaneo sonaqube" width="800">
+</div>
+
+
 
 ---
 
@@ -656,40 +694,6 @@ ENTRYPOINT ["dotnet", "ServiceDemo.API.dll"]
 | Runtime (final) | `dotnet/aspnet:9.0` | ~220 MB |
 
 >  Cloud Run requiere que la aplicación escuche en el puerto `8080`. Las variables `ASPNETCORE_URLS` y `ASPNETCORE_HTTP_PORTS` garantizan esto explícitamente.
-
----
-
-## 📊 Análisis de calidad con SonarCloud
-
-### Exclusiones configuradas
-
-#### `sonar.exclusions` — Excluye completamente del análisis
-
-| Patrón | Razón |
-|---|---|
-| `**/Migrations/**` | Código generado por Entity Framework |
-| `**/obj/**`, `**/bin/**` | Artefactos de compilación |
-| `**/Program.cs` | Punto de entrada, sin lógica de negocio |
-| `**/DependencyInjection.cs` | Solo registro de servicios |
-| `src/ServiceDemo.Domain/**` | Entidades y POCOs sin lógica |
-| `ServiceDemoDbContext.cs` | Configuración de EF Core |
-| `src/ServiceDemo.Application/Mappings/**` | Perfiles de AutoMapper |
-
-#### `sonar.coverage.exclusions` — Excluye solo del cálculo de cobertura
-
-| Patrón | Razón |
-|---|---|
-| `src/ServiceDemo.Infrastructure/**` | Requiere DB real o mocks complejos |
-| `src/ServiceDemo.API/**` | Requiere integration tests |
-| `src/ServiceDemo.Application/Validators/**` | Validaciones de FluentValidation |
-| `src/ServiceDemo.Application/Common/**` | Clases de utilidad |
-
-### Diferencia clave
-
-```text
-sonar.exclusions          → El archivo NO aparece en SonarCloud
-sonar.coverage.exclusions → El archivo SÍ aparece, pero NO cuenta en el % de cobertura
-```
 
 ---
 
