@@ -37,10 +37,11 @@
 - [Pipeline CD — Paso a paso](#-pipeline-cd--paso-a-paso)
 - [Seguridad del pipeline](#-seguridad-del-pipeline)
 - [Monitoreo y Observabilidad](#-monitoreo-y-observabilidad)
-- [Dockerfile](#-dockerfile)
 - [Análisis de calidad con SonarCloud](#-análisis-de-calidad-con-sonarcloud)
+- [Dockerfile](#-dockerfile)
+- [Reflexión sobre Eficiencia Operativa](#-reflexión-sobre-eficiencia-operativa)
 - [Endpoints del servicio](#-endpoints-del-servicio)
-- [Comandos útiles](#-comandos-útiles)
+- [Referencias](#-referencias)
 
 ---
 
@@ -532,19 +533,6 @@ gcloud run services describe mi-app \
   <img src="docs/img/current-trivy-scan-report.png" alt="Reporte actual" width="800">
 </div>
 
-
-###  Evidencia — Scaneo de Sonarqube PullRequest
-
-<div align="center">
-  <img src="docs/img/ci-pull-request-to-main.png" alt="Scaneo sonaqube pull request" width="800">
-</div>
-
-###  Evidencia — Scaneo de Sonarqube 
-
-<div align="center">
-  <img src="docs/img/sonar-qube-scan.png" alt="Scaneo sonaqube" width="800">
-</div>
-
 ---
 
 ## 📊 Monitoreo y Observabilidad
@@ -562,21 +550,21 @@ El pipeline despliega automáticamente recursos de monitoreo en cada ejecución 
 
 ###  Evidencia — Cloud Monitoring
 
-<table style="width:100%; border-collapse:collapse;">
+<table style="width:100%;  border-collapse:collapse;">
   <tr>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="cloud-monitoring.png" alt="Dashboard SLIs" width="100%">
+      <img src="docs/img/cloud-monitoring.png" alt="Dashboard SLIs" width="100%">
     </td>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="cloud-minitoring-rate-alto.png" alt="Alerta 5xx" width="100%">
+      <img src="docs/img/cloud-monitoring-email.png" alt="Historial de correos" width="100%">
     </td>
   </tr>
   <tr>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="cloud-minitoring-tasa-exito.png" alt="Tasa de éxito baja" width="100%">
+      <img src="docs/img/cloud-minitoring-tasa-exito.png" alt="Tasa de éxito baja" width="100%">
     </td>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="cloud-monitoring-email.png" alt="Historial de correos" width="100%">
+      <img src="docs/img/cloud-minitoring-rate-alto.png" alt="Alerta 5xx" width="100%">
     </td>
   </tr>
 </table>
@@ -610,6 +598,57 @@ Grafana está desplegado en Cloud Run con persistencia en **Cloud SQL PostgreSQL
 <div align="center">
   <img src="docs/img/grafana-dashboard.png" alt="Grafana Dashboard" width="800">
 </div>
+
+
+---
+
+## 📊 Análisis de calidad con SonarCloud
+
+### Exclusiones configuradas
+
+#### `sonar.exclusions` — Excluye completamente del análisis
+
+| Patrón | Razón |
+|---|---|
+| `**/Migrations/**` | Código generado por Entity Framework |
+| `**/obj/**`, `**/bin/**` | Artefactos de compilación |
+| `**/Program.cs` | Punto de entrada, sin lógica de negocio |
+| `**/DependencyInjection.cs` | Solo registro de servicios |
+| `src/ServiceDemo.Domain/**` | Entidades y POCOs sin lógica |
+| `ServiceDemoDbContext.cs` | Configuración de EF Core |
+| `src/ServiceDemo.Application/Mappings/**` | Perfiles de AutoMapper |
+
+#### `sonar.coverage.exclusions` — Excluye solo del cálculo de cobertura
+
+| Patrón | Razón |
+|---|---|
+| `src/ServiceDemo.Infrastructure/**` | Requiere DB real o mocks complejos |
+| `src/ServiceDemo.API/**` | Requiere integration tests |
+| `src/ServiceDemo.Application/Validators/**` | Validaciones de FluentValidation |
+| `src/ServiceDemo.Application/Common/**` | Clases de utilidad |
+
+### Diferencia clave
+
+```text
+sonar.exclusions          → El archivo NO aparece en SonarCloud
+sonar.coverage.exclusions → El archivo SÍ aparece, pero NO cuenta en el % de cobertura
+```
+
+
+
+###  Evidencia — Scaneo de Sonarqube PullRequest
+
+<div align="center">
+  <img src="docs/img/ci-pull-request-to-main.png" alt="Scaneo sonaqube pull request" width="800">
+</div>
+
+###  Evidencia — Scaneo de Sonarqube 
+
+<div align="center">
+  <img src="docs/img/sonar-qube-scan.png" alt="Scaneo sonaqube" width="800">
+</div>
+
+
 
 ---
 
@@ -658,38 +697,34 @@ ENTRYPOINT ["dotnet", "ServiceDemo.API.dll"]
 >  Cloud Run requiere que la aplicación escuche en el puerto `8080`. Las variables `ASPNETCORE_URLS` y `ASPNETCORE_HTTP_PORTS` garantizan esto explícitamente.
 
 ---
+## Reflexión sobre Eficiencia Operativa
 
-## 📊 Análisis de calidad con SonarCloud
+La implementación de este pipeline CI/CD representó un cambio fundamental en la forma de entregar software: pasar de un proceso manual, propenso a errores y dependiente de intervención humana, a un flujo completamente automatizado que garantiza calidad, seguridad y disponibilidad en cada despliegue.
 
-### Exclusiones configuradas
+### Automatización y velocidad de entrega
 
-#### `sonar.exclusions` — Excluye completamente del análisis
+Antes de implementar el pipeline, cada despliegue requería ejecutar manualmente los tests, construir la imagen Docker, subirla a un registro y actualizar el servicio en GCP. Con GitHub Actions, todo este proceso ocurre automáticamente en respuesta a un git push, reduciendo el tiempo de entrega de horas a minutos y eliminando la posibilidad de omitir pasos críticos por error humano.
 
-| Patrón | Razón |
-|---|---|
-| `**/Migrations/**` | Código generado por Entity Framework |
-| `**/obj/**`, `**/bin/**` | Artefactos de compilación |
-| `**/Program.cs` | Punto de entrada, sin lógica de negocio |
-| `**/DependencyInjection.cs` | Solo registro de servicios |
-| `src/ServiceDemo.Domain/**` | Entidades y POCOs sin lógica |
-| `ServiceDemoDbContext.cs` | Configuración de EF Core |
-| `src/ServiceDemo.Application/Mappings/**` | Perfiles de AutoMapper |
+### Seguridad integrada desde el inicio (DevSecOps)
 
-#### `sonar.coverage.exclusions` — Excluye solo del cálculo de cobertura
+La integración de SonarCloud y Trivy directamente en el pipeline convierte la seguridad en una parte no negociable del proceso de desarrollo. Ninguna imagen con vulnerabilidades CRITICAL o HIGH con fix disponible puede llegar a producción, ya que el pipeline falla automáticamente antes del push a Artifact Registry. Esto implementa el principio de "shift left security": detectar problemas lo más temprano posible en el ciclo de vida, cuando son más baratos y fáciles de corregir.
 
-| Patrón | Razón |
-|---|---|
-| `src/ServiceDemo.Infrastructure/**` | Requiere DB real o mocks complejos |
-| `src/ServiceDemo.API/**` | Requiere integration tests |
-| `src/ServiceDemo.Application/Validators/**` | Validaciones de FluentValidation |
-| `src/ServiceDemo.Application/Common/**` | Clases de utilidad |
+### Resiliencia operativa
 
-### Diferencia clave
+El mecanismo de rollback automático implementado en el Job CD garantiza que un despliegue fallido no deje el servicio caído. Si el health check no obtiene respuesta HTTP 200 en cinco intentos, el tráfico se restaura automáticamente a la revisión anterior de Cloud Run. Esto reduce el tiempo de recuperación ante fallos (MTTR) sin intervención manual.
 
-```text
-sonar.exclusions          → El archivo NO aparece en SonarCloud
-sonar.coverage.exclusions → El archivo SÍ aparece, pero NO cuenta en el % de cobertura
-```
+### Observabilidad
+
+La combinación de Cloud Monitoring y Grafana proporciona visibilidad completa del comportamiento del servicio en producción. Las alertas automáticas permiten detectar degradaciones de rendimiento o errores antes de que los usuarios los reporten. Grafana, desplegado con persistencia en Cloud SQL, garantiza que los dashboards estén siempre disponibles y actualizados.
+
+### Versionamiento semántico
+
+La estrategia de versiones implementada (SHA para commits de desarrollo, vX.Y.Z para releases) permite trazabilidad completa: en cualquier momento es posible identificar exactamente qué versión del código está corriendo en producción y reproducir el entorno exacto de cualquier despliegue anterior.
+
+### Lecciones aprendidas
+- La autenticación mediante Workload Identity Federation elimina la necesidad de gestionar claves de servicio estáticas, reduciendo significativamente la superficie de ataque en el pipeline.
+- El uso de Secret Manager para inyectar la cadena de conexión en tiempo de ejecución garantiza que las credenciales nunca estén en el código ni en los logs del pipeline.
+- Separar el build local del push al registro, con el escaneo de Trivy en medio, es una práctica que evita publicar imágenes inseguras incluso si el escaneo falla inesperadamente.
 
 ---
 
@@ -705,6 +740,17 @@ sonar.coverage.exclusions → El archivo SÍ aparece, pero NO cuenta en el % de 
 ```
 https://mi-app-omaolvi2za-uc.a.run.app/
 ```
+
+---
+##  Referencias
+
+*   [GitHub Actions Documentation](https://docs.github.com/en/actions) - Guía oficial para la automatización de flujos de trabajo.
+*   [SonarCloud Documentation](https://docs.sonarcloud.io/) - Documentación para el análisis de calidad de código y Quality Gates.
+*   [Trivy Documentation](https://aquasecurity.github.io/trivy/) - Guía de escaneo de vulnerabilidades en contenedores y dependencias.
+*   [Google Cloud Run Documentation](https://cloud.google.com/run/docs) - Guías sobre despliegue, escalado y gestión de revisiones.
+*   [Google Cloud Monitoring](https://cloud.google.com/monitoring/docs) - Documentación para la recolección de métricas, creación de dashboards y alertas.
+*   [Grafana Documentation](https://grafana.com/docs/) - Guía de visualización de datos y configuración de data sources.
+*   [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation) - Documentación sobre autenticación segura entre GitHub y GCP sin llaves de servicio.
 
 ---
 
