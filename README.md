@@ -537,6 +537,7 @@ gcloud run services describe mi-app \
 
 ## 📊 Monitoreo y Observabilidad
 
+
 ### Cloud Monitoring — Dashboards y Alertas
 
 El pipeline despliega automáticamente recursos de monitoreo en cada ejecución exitosa:
@@ -574,6 +575,8 @@ El pipeline despliega automáticamente recursos de monitoreo en cada ejecución 
 
 Grafana está desplegado en Cloud Run con persistencia en **Cloud SQL PostgreSQL 15**, garantizando que los dashboards sobrevivan reinicios del contenedor.
 
+> Se optó por utilizar las métricas nativas de Google Cloud Monitoring API para reducir la complejidad operativa y aprovechar la observabilidad integrada de Cloud Run. Esto elimina la necesidad de gestionar infraestructura adicional de Prometheus y garantiza una integración directa con el servicio de Grafana desplegado.
+
 | Componente | Detalle |
 |---|---|
 | Servicio | `grafana-service` en Cloud Run |
@@ -593,11 +596,86 @@ Grafana está desplegado en Cloud Run con persistencia en **Cloud SQL PostgreSQL
 | Memory Utilization | `run.googleapis.com/container/memory/utilizations` | Uso de memoria |
 | Instance Count | `run.googleapis.com/container/instance_count` | Instancias activas (escala automática) |
 
-###  Evidencia — Grafana Dashboard
+#### Paso a Paso Instalacion de Grafana 
+##### Paso 1 — Crear la instancia de Cloud SQL (PostgreSQL 15)
+
+```bash
+gcloud sql instances create grafana-db-instance \
+    --database-version=POSTGRES_15 \
+    --tier=db-f1-micro \
+    --region=us-central1 \
+    --project=cicd-net-498818
+```
+
+**Resultado:**
+
+```
+NAME                 DATABASE_VERSION  LOCATION       TIER         PRIMARY_ADDRESS  STATUS
+grafana-db-instance  POSTGRES_15       us-central1-c  db-f1-micro  34.31.103.228    RUNNABLE
+```
+
+##### Paso 2 — Crear la base de datos y el usuario
+
+```bash
+gcloud sql databases create grafana_db --instance=grafana-db-instance
+gcloud sql users create grafana_user --instance=grafana-db-instance --password=<PASSWORD>
+```
+
+##### Paso 3 — Crear la Service Account para Grafana
+Grafana necesita una identidad propia para autenticarse con Google Cloud Monitoring API y leer las métricas de Cloud Run.
+
+- Crear la Service Account
+```bash
+gcloud iam service-accounts create grafana-monitoring \
+  --display-name="Grafana Monitoring SA" \
+  --project=cicd-net-498818
+  ```
+
+- Asignar permiso de solo lectura de métricas
+```bash 
+gcloud projects add-iam-policy-binding cicd-net-498818 \
+  --member="serviceAccount:grafana-monitoring@cicd-net-498818.iam.gserviceaccount.com" \
+  --role="roles/monitoring.viewer"
+```
+##### Paso 4 — Desplegar Grafana en Cloud Run
+
+```bash
+gcloud run deploy grafana-service \
+  --image=grafana/grafana:latest \
+  --region=us-central1 \
+  --project=cicd-net-498818 \
+  --allow-unauthenticated \
+  --port=3000 \
+  --set-env-vars="GF_DATABASE_TYPE=postgres,\
+GF_DATABASE_HOST=/cloudsql/cicd-net-498818:us-central1:grafana-db-instance,\
+GF_DATABASE_NAME=grafana_db,\
+GF_DATABASE_USER=grafana_user,\
+GF_DATABASE_PASSWORD=<PASSWORD>,\
+GF_AUTH_ANONYMOUS_ENABLED=true,\
+GF_AUTH_ANONYMOUS_ORG_ROLE=Admin" \
+  --add-cloudsql-instances=cicd-net-498818:us-central1:grafana-db-instance \
+  --service-account=grafana-monitoring@cicd-net-498818.iam.gserviceaccount.com
+```
+> ***Nota:*** El parámetro --service-account vincula la instancia de Grafana con la identidad creada en el Paso 3, garantizando que el Data Source de Google Cloud Monitoring tenga los permisos necesarios para consumir métricas de Cloud Run.
+
+
+#### Evidencia — Resultados del Dashboard de Grafana tras la prueba de carga con K6
 
 <div align="center">
-  <img src="docs/img/grafana-dashboard.png" alt="Grafana Dashboard" width="800">
+  <img src="docs/img/grafana-dashboard.png" alt="Grafana Dashboard:00- Service Demo - Metricas Basicas" width="800">
 </div>
+
+#### Evidencia — Resultados del Dashboard de Grafana ultimas 24h
+
+<div align="center">
+  <img src="docs/img/grafana-dashboard-24h.png" alt="Grafana Dashboard ultimas 24 horas" width="800">
+</div>
+
+**URL base grafana:**
+
+```
+https://grafana-service-802338067803.us-central1.run.app/
+```
 
 
 ---
@@ -735,7 +813,7 @@ La estrategia de versiones implementada (SHA para commits de desarrollo, vX.Y.Z 
 | `/scalar/v1` | Documentación interactiva (Scalar UI) |
 | `/health` | Health check del servicio |
 
-**URL base en producción:**
+**URL base :**
 
 ```
 https://mi-app-omaolvi2za-uc.a.run.app/
