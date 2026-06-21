@@ -555,7 +555,7 @@ El pipeline despliega automáticamente recursos de monitoreo en cada ejecución 
       <img src="docs/img/cloud-monitoring.png" alt="Dashboard SLIs" width="100%">
     </td>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="docs/img/cloud-minitoring-rate-alto.png" alt="Alerta 5xx" width="100%">
+      <img src="docs/img/cloud-monitoring-email.png" alt="Historial de correos" width="100%">
     </td>
   </tr>
   <tr>
@@ -563,7 +563,7 @@ El pipeline despliega automáticamente recursos de monitoreo en cada ejecución 
       <img src="docs/img/cloud-minitoring-tasa-exito.png" alt="Tasa de éxito baja" width="100%">
     </td>
     <td style="width:50%; border:1px solid #ccc;">
-      <img src="docs/img/cloud-monitoring-email.png" alt="Historial de correos" width="100%">
+      <img src="docs/img/cloud-minitoring-rate-alto.png" alt="Alerta 5xx" width="100%">
     </td>
   </tr>
 </table>
