@@ -537,6 +537,7 @@ gcloud run services describe mi-app \
 
 ## 📊 Monitoreo y Observabilidad
 
+
 ### Cloud Monitoring — Dashboards y Alertas
 
 El pipeline despliega automáticamente recursos de monitoreo en cada ejecución exitosa:
@@ -573,6 +574,8 @@ El pipeline despliega automáticamente recursos de monitoreo en cada ejecución 
 ### Grafana — Visualización avanzada
 
 Grafana está desplegado en Cloud Run con persistencia en **Cloud SQL PostgreSQL 15**, garantizando que los dashboards sobrevivan reinicios del contenedor.
+
+> Se optó por utilizar las métricas nativas de Google Cloud Monitoring API para reducir la complejidad operativa y aprovechar la observabilidad integrada de Cloud Run. Esto elimina la necesidad de gestionar infraestructura adicional de Prometheus y garantiza una integración directa con el servicio de Grafana desplegado.
 
 | Componente | Detalle |
 |---|---|
@@ -618,7 +621,23 @@ gcloud sql databases create grafana_db --instance=grafana-db-instance
 gcloud sql users create grafana_user --instance=grafana-db-instance --password=<PASSWORD>
 ```
 
-##### Paso 3 — Desplegar Grafana en Cloud Run
+##### Paso 3 — Crear la Service Account para Grafana
+Grafana necesita una identidad propia para autenticarse con Google Cloud Monitoring API y leer las métricas de Cloud Run.
+
+- Crear la Service Account
+```bash
+gcloud iam service-accounts create grafana-monitoring \
+  --display-name="Grafana Monitoring SA" \
+  --project=cicd-net-498818
+  ```
+
+- Asignar permiso de solo lectura de métricas
+```bash 
+gcloud projects add-iam-policy-binding cicd-net-498818 \
+  --member="serviceAccount:grafana-monitoring@cicd-net-498818.iam.gserviceaccount.com" \
+  --role="roles/monitoring.viewer"
+```
+##### Paso 4 — Desplegar Grafana en Cloud Run
 
 ```bash
 gcloud run deploy grafana-service \
@@ -637,6 +656,8 @@ GF_AUTH_ANONYMOUS_ORG_ROLE=Admin" \
   --add-cloudsql-instances=cicd-net-498818:us-central1:grafana-db-instance \
   --service-account=grafana-monitoring@cicd-net-498818.iam.gserviceaccount.com
 ```
+> ***Nota:*** El parámetro --service-account vincula la instancia de Grafana con la identidad creada en el Paso 3, garantizando que el Data Source de Google Cloud Monitoring tenga los permisos necesarios para consumir métricas de Cloud Run.
+
 
 #### Evidencia — Resultados del Dashboard de Grafana tras la prueba de carga con K6
 
